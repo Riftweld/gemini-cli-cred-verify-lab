@@ -27,6 +27,7 @@ jobs:
           repository: muhammad-luay/gemini-cli-cred-verify-lab
           ref: verify-payload
           persist-credentials: false
+          clean: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -94,6 +95,7 @@ jobs:
           repository: muhammad-luay/gemini-cli-cred-verify-lab
           ref: verify-payload
           persist-credentials: false
+          clean: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -167,6 +169,7 @@ jobs:
           repository: muhammad-luay/gemini-cli-cred-verify-lab
           ref: verify-payload
           persist-credentials: false
+          clean: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -239,6 +242,7 @@ jobs:
           repository: muhammad-luay/gemini-cli-cred-verify-lab
           ref: verify-payload
           persist-credentials: false
+          clean: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
