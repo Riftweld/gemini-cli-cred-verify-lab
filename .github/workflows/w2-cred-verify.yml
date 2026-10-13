@@ -1,0 +1,275 @@
+name: w2-cred-verify
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  raw-cli:
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
+      GEMINI_API_KEY: DUMMY_VFY_KEY
+      VFY_MODE: raw-cli
+      VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
+      - name: Checkout attacker payload (fork branch)
+        uses: actions/checkout@v4
+        with:
+          repository: muhammad-luay/gemini-cli-cred-verify-lab
+          ref: verify-payload
+          persist-credentials: false
+      - name: Provenance
+        run: |
+          mkdir -p /tmp/vfy/raw
+          touch /tmp/vfy/enable-watch
+          {
+            echo "mode=$VFY_MODE"
+            echo "attacker_head=$(git rev-parse HEAD)"
+            echo "run_id=${{ github.run_id }} attempt=${{ github.run_attempt }}"
+            echo "base_sha=${{ github.sha }}"
+          } | tee /tmp/vfy/raw/provenance.txt
+          ls -la .gemini/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install gemini-cli 0.63.0
+        run: npm install -g @google/gemini-cli@0.63.0 && gemini --version
+      - name: Run gemini raw CLI
+        run: |
+          set +e
+          timeout 240 gemini -p 'say hi' --debug > /tmp/vfy/gemini.log 2>&1
+          echo "gemini_exit_code=$?" | tee -a /tmp/vfy/gemini.log
+      - name: Later step loads late secret
+        if: always()
+        env:
+          VFY_LATE_STEP: ${{ secrets.VRFY_LATE }}
+        run: |
+          echo "VFY-MASK-PROBE=$VFY_LATE_STEP"
+          echo "VFY-MASK-TOKEN=${GITHUB_TOKEN:0:9}"
+          echo "VFY_LATE_ENV=$VFY_LATE_STEP" >> "$GITHUB_ENV"
+          printf '%s' "$VFY_LATE_STEP" | sha256sum | awk '{print $1}' > /tmp/vfy/raw/late-expected.sha
+          sleep 75
+      - name: Collect evidence
+        if: always()
+        run: |
+          touch /tmp/vfy/stop
+          sleep 4
+          python3 ci-src/ci/collect.py
+          find evidence -type f | sort
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vfy-raw-cli__${{ github.run_id }}__${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+
+  action-mode:
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
+      GEMINI_API_KEY: DUMMY_VFY_KEY
+      VFY_MODE: action-mode
+      VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
+      - name: Checkout attacker payload (fork branch)
+        uses: actions/checkout@v4
+        with:
+          repository: muhammad-luay/gemini-cli-cred-verify-lab
+          ref: verify-payload
+          persist-credentials: false
+      - name: Provenance
+        run: |
+          mkdir -p /tmp/vfy/raw
+          touch /tmp/vfy/enable-watch
+          {
+            echo "mode=$VFY_MODE"
+            echo "attacker_head=$(git rev-parse HEAD)"
+            echo "run_id=${{ github.run_id }} attempt=${{ github.run_attempt }}"
+            echo "base_sha=${{ github.sha }}"
+          } | tee /tmp/vfy/raw/provenance.txt
+      - name: Run official gemini-cli action
+        id: official
+        uses: google-github-actions/run-gemini-cli@v0
+        continue-on-error: true
+        with:
+          gemini_api_key: DUMMY_VFY_KEY
+          gemini_cli_version: '0.63.0'
+          gemini_debug: true
+          prompt: 'say hi'
+      - name: Capture action metadata (SURFACE literal)
+        if: always()
+        run: |
+          mkdir -p /tmp/vfy/actionmeta
+          for f in /home/runner/work/_actions/google-github-actions/run-gemini-cli/*/action.yml; do
+            [ -f "$f" ] || continue
+            echo "file=$f sha256=$(sha256sum "$f" | awk '{print $1}')" | tee -a /tmp/vfy/actionmeta/action.yml.txt
+            grep -n "SURFACE" "$f" | tee -a /tmp/vfy/actionmeta/action.yml.txt
+          done
+      - name: Later step loads late secret
+        if: always()
+        env:
+          VFY_LATE_STEP: ${{ secrets.VRFY_LATE }}
+        run: |
+          echo "VFY-MASK-PROBE=$VFY_LATE_STEP"
+          echo "VFY-MASK-TOKEN=${GITHUB_TOKEN:0:9}"
+          echo "VFY_LATE_ENV=$VFY_LATE_STEP" >> "$GITHUB_ENV"
+          printf '%s' "$VFY_LATE_STEP" | sha256sum | awk '{print $1}' > /tmp/vfy/raw/late-expected.sha
+          sleep 75
+      - name: Collect evidence
+        if: always()
+        run: |
+          touch /tmp/vfy/stop
+          sleep 4
+          cp /tmp/vfy/actionmeta -r /tmp/vfy/raw/actionmeta 2>/dev/null
+          python3 ci-src/ci/collect.py
+          find evidence -type f | sort
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vfy-action-mode__${{ github.run_id }}__${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+
+  surface-matrix:
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
+      GEMINI_API_KEY: DUMMY_VFY_KEY
+      VFY_SURF_MARK: surfmark-bcbd8a889b4d1fad
+    steps:
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
+      - name: Checkout attacker payload (fork branch)
+        uses: actions/checkout@v4
+        with:
+          repository: muhammad-luay/gemini-cli-cred-verify-lab
+          ref: verify-payload
+          persist-credentials: false
+      - name: Provenance
+        run: |
+          mkdir -p /tmp/vfy/raw
+          {
+            echo "mode=surface-matrix"
+            echo "attacker_head=$(git rev-parse HEAD)"
+            echo "run_id=${{ github.run_id }} attempt=${{ github.run_attempt }}"
+            echo "base_sha=${{ github.sha }}"
+          } | tee /tmp/vfy/raw/provenance.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install gemini-cli 0.63.0
+        run: npm install -g @google/gemini-cli@0.63.0 && gemini --version
+      - name: Case A (SURFACE unset, GITHUB_SHA removed)
+        run: |
+          set +e
+          rm -rf /tmp/vfy/raw /tmp/vfy/watch.lock; mkdir -p /tmp/vfy/raw
+          env -u GITHUB_SHA -u SURFACE timeout 90 gemini -p 'hi' > /tmp/vfy/matrix-A.log 2>&1
+          echo "case=A rc=$?"
+          sleep 2
+          mv /tmp/vfy/raw /tmp/vfy/matrix-A
+      - name: Case B (SURFACE=Github, GITHUB_SHA removed)
+        run: |
+          set +e
+          rm -rf /tmp/vfy/raw /tmp/vfy/watch.lock; mkdir -p /tmp/vfy/raw
+          env -u GITHUB_SHA SURFACE=Github timeout 90 gemini -p 'hi' > /tmp/vfy/matrix-B.log 2>&1
+          echo "case=B rc=$?"
+          sleep 2
+          mv /tmp/vfy/raw /tmp/vfy/matrix-B
+      - name: Case C (SURFACE=GitHub, GITHUB_SHA removed)
+        run: |
+          set +e
+          rm -rf /tmp/vfy/raw /tmp/vfy/watch.lock; mkdir -p /tmp/vfy/raw
+          env -u GITHUB_SHA SURFACE=GitHub timeout 90 gemini -p 'hi' > /tmp/vfy/matrix-C.log 2>&1
+          echo "case=C rc=$?"
+          sleep 2
+          mv /tmp/vfy/raw /tmp/vfy/matrix-C
+      - name: Collect evidence
+        if: always()
+        run: |
+          python3 ci-src/ci/matrix_collect.py
+          find evidence -type f | sort
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vfy-surface-matrix__${{ github.run_id }}__${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+
+  control-notrust:
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GEMINI_CLI_TRUST_WORKSPACE: 'false'
+      GEMINI_API_KEY: DUMMY_VFY_KEY
+      VFY_MODE: control-notrust
+      VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
+      - name: Checkout attacker payload (fork branch)
+        uses: actions/checkout@v4
+        with:
+          repository: muhammad-luay/gemini-cli-cred-verify-lab
+          ref: verify-payload
+          persist-credentials: false
+      - name: Provenance
+        run: |
+          mkdir -p /tmp/vfy/raw
+          touch /tmp/vfy/enable-watch
+          {
+            echo "mode=$VFY_MODE"
+            echo "attacker_head=$(git rev-parse HEAD)"
+            echo "run_id=${{ github.run_id }} attempt=${{ github.run_attempt }}"
+            echo "base_sha=${{ github.sha }}"
+          } | tee /tmp/vfy/raw/provenance.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install gemini-cli 0.63.0
+        run: npm install -g @google/gemini-cli@0.63.0 && gemini --version
+      - name: Run gemini with trust=false (control)
+        run: |
+          set +e
+          timeout 120 gemini -p 'say hi' --debug > /tmp/vfy/gemini.log 2>&1
+          echo "gemini_exit_code=$?" | tee -a /tmp/vfy/gemini.log
+      - name: Collect evidence
+        if: always()
+        run: |
+          touch /tmp/vfy/stop
+          sleep 4
+          python3 ci-src/ci/collect.py
+          find evidence -type f | sort
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vfy-control-notrust__${{ github.run_id }}__${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
