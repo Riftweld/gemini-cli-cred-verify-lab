@@ -51,6 +51,18 @@ def first_value(files, needle):
     return None, None, None
 
 
+def first_occurrence(files, needle):
+    """First raw occurrence of `needle` (a value): returns (relpath, value)."""
+    for rel in sorted(files):
+        data = files[rel]
+        i = data.find(needle)
+        if i >= 0:
+            j = data.find(b"\n", i)
+            seg = data[i:j if j >= 0 else len(data)]
+            return rel, seg.rstrip(b"\r")
+    return None, None
+
+
 def occurrences(files, needle):
     return {rel: data.count(needle) for rel, data in files.items() if needle in data}
 
@@ -86,7 +98,8 @@ def main():
         hits = occurrences(files, github_token.encode())
         report["github_token_occurrences"] = sum(hits.values())
         report["github_token_capture_files"] = len(hits)
-        rel, val, _marker = first_value(files, github_token.encode())
+        report["github_token_capture_file_list"] = sorted(hits)[:5]
+        rel, val = first_occurrence(files, github_token.encode())
         if rel:
             report["github_token_capture_file"] = rel
             report["github_token_captured_sha256"] = sha256_text(val.decode())
@@ -103,7 +116,8 @@ def main():
         hits = occurrences(files, job_canary.encode())
         report["vfy_job_capture_files"] = len(hits)
         report["vfy_job_value_hits"] = sum(hits.values())
-        rel, val, _marker = first_value(files, job_canary.encode())
+        report["vfy_job_capture_file_list"] = sorted(hits)[:5]
+        rel, val = first_occurrence(files, job_canary.encode())
         if rel:
             report["vfy_job_captured_sha256"] = sha256_text(val.decode())
             report["vfy_job_hash_match"] = (
