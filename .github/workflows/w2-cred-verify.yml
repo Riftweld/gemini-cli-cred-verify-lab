@@ -16,11 +16,6 @@ jobs:
       VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout trusted collector (base main)
-        uses: actions/checkout@v4
-        with:
-          path: ci-src
-          persist-credentials: false
       - name: Checkout attacker payload (fork branch)
         uses: actions/checkout@v4
         with:
@@ -28,6 +23,11 @@ jobs:
           ref: verify-payload
           persist-credentials: false
           clean: false
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -84,11 +84,6 @@ jobs:
       VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout trusted collector (base main)
-        uses: actions/checkout@v4
-        with:
-          path: ci-src
-          persist-credentials: false
       - name: Checkout attacker payload (fork branch)
         uses: actions/checkout@v4
         with:
@@ -96,6 +91,11 @@ jobs:
           ref: verify-payload
           persist-credentials: false
           clean: false
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -158,11 +158,6 @@ jobs:
       GEMINI_API_KEY: DUMMY_VFY_KEY
       VFY_SURF_MARK: surfmark-bcbd8a889b4d1fad
     steps:
-      - name: Checkout trusted collector (base main)
-        uses: actions/checkout@v4
-        with:
-          path: ci-src
-          persist-credentials: false
       - name: Checkout attacker payload (fork branch)
         uses: actions/checkout@v4
         with:
@@ -170,6 +165,11 @@ jobs:
           ref: verify-payload
           persist-credentials: false
           clean: false
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
@@ -231,11 +231,6 @@ jobs:
       VFY_JOB_SECRET: ${{ secrets.VRFY_JOB }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout trusted collector (base main)
-        uses: actions/checkout@v4
-        with:
-          path: ci-src
-          persist-credentials: false
       - name: Checkout attacker payload (fork branch)
         uses: actions/checkout@v4
         with:
@@ -243,6 +238,11 @@ jobs:
           ref: verify-payload
           persist-credentials: false
           clean: false
+      - name: Checkout trusted collector (base main)
+        uses: actions/checkout@v4
+        with:
+          path: ci-src
+          persist-credentials: false
       - name: Provenance
         run: |
           mkdir -p /tmp/vfy/raw
